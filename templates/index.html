@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Image to WebP Converter</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+
+    .preview-container img {
+      max-height: 100px;
+      object-fit: cover;
+    }
+  </style>
+</head>
+
+<body class="bg-gradient-to-tr from-green-100 via-green-50 to-white min-h-screen flex items-center justify-center p-6">
+  <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-2xl border border-green-200 relative">
+    <div class="text-center mb-6">
+      <div class="flex items-center justify-center mb-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-green-600" viewBox="0 0 20 20"
+          fill="currentColor">
+          <path
+            d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h4a1 1 0 000-2H4V5h12v10h-4a1 1 0 100 2h4a2 2 0 002-2V5a2 2 0 00-2-2H4z" />
+          <path d="M8 12l2-2 2 2 4-4v6H4v-6l4 4z" />
+        </svg>
+        <h1 class="text-3xl font-bold text-green-700 ml-2">WebP Converter</h1>
+      </div>
+      <p class="text-gray-500">Upload a folder of images, preview them, and convert to WebP!</p>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="space-y-6" id="uploadForm">
+      <div
+        class="border-2 border-dashed border-green-300 rounded-xl p-6 text-center bg-green-50 hover:bg-green-100 transition cursor-pointer"
+        onclick="document.getElementById('folderInput').click()" ondragover="event.preventDefault()"
+        ondrop="handleDrop(event)">
+        <p class="text-green-600 font-semibold">Drag & Drop a Folder of Images Here</p>
+        <p class="text-gray-500 text-sm">or click to select folder</p>
+        <input type="file" name="images" id="folderInput" multiple required accept="image/*" webkitdirectory directory
+          class="hidden" onchange="handleFiles(this.files)" />
+      </div>
+
+      <div id="preview" class="preview-container grid grid-cols-4 gap-3"></div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1 mt-4">Resize (0.1 to 1)</label>
+        <input type="number" name="scale" step="0.1" min="0.1" max="1" value="0.5" required
+          class="w-full p-2 border rounded-md focus:ring-2 focus:ring-green-400 focus:outline-none transition" />
+      </div>
+
+      <button type="submit" id="convertButton"
+        class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-xl transition duration-300 transform hover:scale-105 flex justify-center items-center">
+        <span id="buttonText">Convert & Download ZIP</span>
+      </button>
+    </form>
+  </div>
+
+  <script>
+    let selectedFiles = [];
+    let dotsInterval;
+
+    function handleFiles(fileList) {
+      const preview = document.getElementById('preview');
+      preview.innerHTML = '';
+      selectedFiles = Array.from(fileList);
+
+      selectedFiles.forEach((file, index) => {
+        if (!file.type.startsWith('image/')) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const container = document.createElement('div');
+          container.className = 'relative group';
+
+          const img = document.createElement('img');
+          img.src = e.target.result;
+          img.className = 'rounded shadow border border-gray-200';
+
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.innerHTML = '✖';
+          removeBtn.className =
+            'absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center opacity-80 hover:opacity-100 transition';
+          removeBtn.onclick = () => {
+            selectedFiles.splice(index, 1);
+            handleFiles(selectedFiles);
+          };
+
+          container.appendChild(img);
+          container.appendChild(removeBtn);
+          preview.appendChild(container);
+        };
+        reader.readAsDataURL(file);
+      });
+
+      const dataTransfer = new DataTransfer();
+      selectedFiles.forEach((file) => dataTransfer.items.add(file));
+      document.getElementById('folderInput').files = dataTransfer.files;
+    }
+
+    function handleDrop(event) {
+      event.preventDefault();
+      const files = event.dataTransfer.files;
+      document.getElementById('folderInput').files = files;
+      handleFiles(files);
+    }
+
+    function onConversionComplete() {
+      clearInterval(dotsInterval);
+      document.getElementById('buttonText').textContent = 'Download ZIP Folder';
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const scale = document.querySelector('input[name="scale"]').value;
+      const files = document.getElementById('folderInput').files;
+      if (!files.length) return;
+
+      const buttonText = document.getElementById('buttonText');
+      buttonText.textContent = 'Converting';
+      let dots = '';
+      dotsInterval = setInterval(() => {
+        dots = dots.length < 3 ? dots + '.' : '';
+        buttonText.textContent = 'Converting' + dots;
+      }, 500);
+
+      const formData = new FormData();
+      formData.append('scale', scale);
+      for (let i = 0; i < files.length; i++) {
+        formData.append('images', files[i]);
+      }
+
+      fetch('https://convert-image-to-webp-backend.onrender.com/convert', {
+        method: 'POST',
+        body: formData
+      })
+        .then(res => res.blob())
+        .then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'converted_images.zip';
+          a.click();
+          window.URL.revokeObjectURL(url);
+          onConversionComplete();
+        })
+        .catch(err => {
+          clearInterval(dotsInterval);
+          buttonText.textContent = 'Something went wrong!';
+          console.error(err);
+        });
+    });
+  </script>
+
+</body>
+
+</html>

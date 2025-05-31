@@ -3,8 +3,10 @@ from PIL import Image
 import os
 import io
 import zipfile
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 
 @app.route("/", methods=["GET", "POST"])
@@ -53,4 +55,4 @@ if __name__ == "__main__":
 # This code is a Flask application that allows users to upload images, resize them, and convert them to WebP format.
 # It packages the converted images into a zip file for download.
 # The application uses the Pillow library for image processing and handles file uploads through Flask's request object.
-# The main route handles both GET and POST requests, processing the images and returning a zip file with the converted images.  
+# The main route handles both GET and POST requests, processing the images and returning a zip file with the converted images.
